@@ -1,36 +1,18 @@
 # Ctrl Keyboard (Android)
 
-Keyboard Android dengan baris tombol ekstra: **Esc, Tab, Ctrl, Alt, Ins, Del, Home, End, PgUp, PgDn**,
-plus **Shift** dan tombol panah ← ↑ ↓ →.
+Satu keyboard, dua mode.
 
-## Tata letak
-```
-Esc  Tab  Ctrl  Alt  Ins  Del  Home  End  PgUp  PgDn
-1    2    3     4    5    6    7     8    9     0
-q    w    e     r    t    y    u     i    o     p
-a    s    d     f    g    h    j     k    l
-⇧Shift  z  x  c  v  b  n  m  ⌫
-?123  ,     spasi     .  ←  ↑  ↓  →  ⏎
-```
-`?123` membuka layer simbol (! @ # - _ = [ ] { } \ | ; : ' " ` ~ < > / ?).
+**Mode Teks (ala Gboard)**
+- QWERTY 4 baris; tahan huruf untuk angka/simbol (q→1, a→@, dst.), `?123` dan `=\<` untuk simbol.
+- Bar saran: melengkapi kata, menebak kata berikutnya, dan menyarankan kalimat yang sering kamu ketik (muncul setelah dipakai 2x). Tahan saran untuk menghapusnya.
+- ☆ = panel kalimat tersimpan (tap = sisipkan, tahan = hapus, "+ Simpan" = sematkan kalimat yang sedang diketik).
+- Huruf besar otomatis di awal kalimat, Shift 2x = caps lock, spasi 2x = titik.
+- Kolom password dan mode incognito tidak dipelajari. Data hanya disimpan di HP.
 
-## Cara pakai modifier
-- Tap 1x → aktif sekali (biru), mati setelah tombol berikutnya
-- Tap 2x → terkunci (oranye)
-- Tap 3x → mati
+**Mode Ctrl** (tombol `⌨ Ctrl` di bar saran; `ABC` untuk kembali)
+- Baris copas: Salin ⌃Ins, Tempel ⇧Ins, Tempel teks (ketik isi clipboard), Ctrl+C.
+- Esc, Tab, Ctrl, Alt, Ins, Del, Home, End, PgUp, PgDn, panah. Modifier: tap 1x sekali, 2x kunci, 3x mati.
 
-Contoh: `Ctrl` → `C` = salin, `Ctrl` → `V` = tempel, `Ctrl` → `A` = pilih semua,
-`Shift` → `Ins` = tempel (di terminal seperti Termux), `Shift` + panah = blok teks.
-Backspace, Del, panah, dan spasi bisa ditahan untuk mengulang.
-
-## Build
-**Cara A – GitHub Actions (tanpa PC):** upload folder ini ke repo GitHub. Workflow
-`.github/workflows/build.yml` otomatis mem-build. Buka tab *Actions* → run terbaru →
-unduh artifact `CtrlKeyboard-apk` → ekstrak → instal `app-debug.apk`.
-
-**Cara B – Android Studio:** File → Open → pilih folder ini → Run / Build APK.
-
-## Instal & aktifkan
-1. Instal APK (izinkan "instal dari sumber tidak dikenal").
-2. Buka aplikasi **Ctrl Keyboard** → *Aktifkan keyboard* → nyalakan.
-3. *Pilih keyboard* → pilih Ctrl Keyboard.
+## Unduh
+APK terbaru: https://github.com/BACOT-ASU/ctrl-keyboard/releases/download/latest/CtrlKeyboard.apk
+(dibuild otomatis oleh GitHub Actions setiap push ke `main`).
