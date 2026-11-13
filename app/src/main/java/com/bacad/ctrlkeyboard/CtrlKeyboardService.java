@@ -58,20 +58,21 @@ public class CtrlKeyboardService extends InputMethodService {
     private static final int C_ONCE = Color.parseColor("#5B6B8C");
     private static final int C_LOCK = Color.parseColor("#A8C7FA");
     private static final int C_PRESSED = Color.parseColor("#5C5C60");
-    private static final int C_HINT = Color.parseColor("#B8B8BC");
+    private static final int C_HINT = Color.parseColor("#D0D0D4");
     private static final int C_ACCENT = Color.parseColor("#A8C7FA");
     private static final int C_ON_ACCENT = Color.parseColor("#0B1D36");
+    private static final int C_PREVIEW = Color.parseColor("#5C5C60");
 
     // ---------------- Mode TEKS (ala Gboard + baris angka). "q %" = tombol q, tahan lama = %
-    private static final String[] T0 = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+    private static final String[] T0 = {"1 !", "2 @", "3 #", "4 $", "5 %", "6 ^", "7 &", "8 *", "9 (", "0 )"};
     private static final String[] T1 = {"q %", "w \\", "e |", "r =", "t [", "y ]", "u <", "i >", "o {", "p }"};
     private static final String[] T2 = {"a @", "s #", "d $", "f _", "g &", "h -", "j +", "k (", "l )"};
     private static final String[] T3 = {":shift", "z *", "x \"", "c '", "v :", "b ;", "n !", "m ?", ":bksp"};
     private static final String[] T4 = {":sym", ",", ":emoji", ":space", ".", ":enter"};
 
     private static final String[] S1_1 = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
-    private static final String[] S1_2 = {"@", "#", "$", "_", "&", "-", "+", "(", ")", "/"};
-    private static final String[] S1_3 = {":sym2", "*", "\"", "'", ":", ";", "!", "?", ":bksp"};
+    private static final String[] S1_2 = {"@", "#", "$", "%", "&", "-", "+", "(", ")", "/"};
+    private static final String[] S1_3 = {":sym2", "*", "\"", "'", ":", ";", "!", "?", "_", ":bksp"};
     private static final String[] S1_4 = {":abc", ",", ":emoji", ":space", ".", ":enter"};
 
     private static final String[] S2_1 = {"~", "`", "|", "•", "√", "π", "÷", "×", "¶", "∆"};
@@ -181,6 +182,7 @@ public class CtrlKeyboardService extends InputMethodService {
         super.onFinishInputView(finishingInput);
         handler.removeCallbacks(saveTask);
         if (store != null) store.save();
+        hidePreview();
     }
 
     @Override
@@ -416,7 +418,7 @@ public class CtrlKeyboardService extends InputMethodService {
         KeyView(Context c) {
             super(c);
             hintPaint.setColor(C_HINT);
-            hintPaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11,
+            hintPaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 13,
                     c.getResources().getDisplayMetrics()));
         }
 
@@ -424,9 +426,10 @@ public class CtrlKeyboardService extends InputMethodService {
         protected void onDraw(android.graphics.Canvas canvas) {
             super.onDraw(canvas);
             if (hint == null) return;
-            float pad = dp(5);
+            float pad = dp(4);
             float w = hintPaint.measureText(hint);
-            canvas.drawText(hint, getWidth() - pad - w, pad - hintPaint.ascent(), hintPaint);
+            canvas.drawText(hint, getScrollX() + getWidth() - pad - w,
+                    getScrollY() + pad - hintPaint.ascent(), hintPaint);
         }
     }
 
@@ -648,10 +651,7 @@ public class CtrlKeyboardService extends InputMethodService {
             @Override public void run() {
                 longFired = true;
                 key.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                // Tampilkan simbolnya di tombol selama masih ditahan
-                key.setText(alt);
-                key.setBackground(bg(C_ACCENT, dp(8)));
-                key.setTextColor(C_ON_ACCENT);
+                showPreview(key, alt, true);
             }
         };
 
@@ -666,6 +666,7 @@ public class CtrlKeyboardService extends InputMethodService {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                     setPressedLook(key, special, true);
                     longFired = false;
+                    if (!special) showPreview(key, key.getText().toString(), false);
                     if (repeat) {
                         onKey(token, true);
                         handler.postDelayed(repeater, 400);
@@ -679,18 +680,66 @@ public class CtrlKeyboardService extends InputMethodService {
                     handler.removeCallbacks(repeater);
                     handler.removeCallbacks(longPress);
                     setPressedLook(key, special, false);
+                    hidePreview();
                     if (repeat) afterRepeat();
-                    else if (longFired) { key.setTextColor(Color.WHITE); onKey(alt, false); refresh(); }
+                    else if (longFired) onKey(alt, false);
                     else onKey(token, false);
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     handler.removeCallbacks(repeater);
                     handler.removeCallbacks(longPress);
                     setPressedLook(key, special, false);
-                    if (longFired) { key.setTextColor(Color.WHITE); refresh(); }
+                    hidePreview();
                     return true;
             }
             return true;
+        }
+    }
+
+    // ---------------------------------------------------------------- key preview (gelembung)
+
+    private android.widget.PopupWindow preview;
+    private TextView previewText;
+
+    private void showPreview(TextView key, String label, boolean longPress) {
+        if (key.getWindowToken() == null || label == null || label.isEmpty()) return;
+        try {
+            if (preview == null) {
+                previewText = new TextView(this);
+                previewText.setGravity(Gravity.CENTER);
+                previewText.setIncludeFontPadding(false);
+                preview = new android.widget.PopupWindow(previewText);
+                preview.setTouchable(false);
+                preview.setFocusable(false);
+                preview.setClippingEnabled(false);
+                preview.setAnimationStyle(0);
+            }
+            previewText.setText(label);
+            previewText.setTextSize(TypedValue.COMPLEX_UNIT_SP, longPress ? 32 : 30);
+            previewText.setTextColor(longPress ? C_ON_ACCENT : Color.WHITE);
+            previewText.setBackground(bg(longPress ? C_ACCENT : C_PREVIEW, dp(12)));
+
+            int[] loc = new int[2];
+            key.getLocationInWindow(loc);
+            int w = Math.max(key.getWidth() + dp(10), dp(52));
+            int h = dp(62);
+            int x = loc[0] + (key.getWidth() - w) / 2;
+            int y = loc[1] - h - dp(2);
+            if (preview.isShowing()) preview.update(x, y, w, h);
+            else {
+                preview.setWidth(w);
+                preview.setHeight(h);
+                preview.showAtLocation(key, Gravity.NO_GRAVITY, x, y);
+            }
+        } catch (Exception ignored) {
+            // Sebagian HP menolak popup di atas keyboard; keyboard tetap jalan tanpa gelembung.
+        }
+    }
+
+    private void hidePreview() {
+        try {
+            if (preview != null && preview.isShowing()) preview.dismiss();
+        } catch (Exception ignored) {
         }
     }
 
