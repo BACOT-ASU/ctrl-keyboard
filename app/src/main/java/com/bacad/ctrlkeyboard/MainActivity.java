@@ -54,6 +54,15 @@ public class MainActivity extends Activity {
         });
         box.addView(pick);
 
+        final android.content.SharedPreferences prefs =
+                getSharedPreferences(CtrlKeyboardService.PREFS, MODE_PRIVATE);
+        android.widget.Switch autoCap = new android.widget.Switch(this);
+        autoCap.setText("Huruf besar otomatis di awal kalimat");
+        autoCap.setChecked(prefs.getBoolean("autoCap", true));
+        autoCap.setPadding(0, p, 0, 0);
+        autoCap.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("autoCap", on).apply());
+        box.addView(autoCap);
+
         stats = new TextView(this);
         stats.setPadding(0, p, 0, p / 2);
         box.addView(stats);

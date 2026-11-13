@@ -107,6 +107,7 @@ public class CtrlKeyboardService extends InputMethodService {
     private long lastShiftTap = 0, lastSpaceTime = 0;
     private boolean learnAllowed = true, suggestAllowed = true;
     private String lastLine = "";
+    private boolean autoCap = true;
 
     // status mode CTRL
     private int ctrl = OFF, shift = OFF, alt = OFF;
@@ -168,6 +169,7 @@ public class CtrlKeyboardService extends InputMethodService {
         layer = numeric ? L_SYM1 : L_ALPHA;
         lastLine = "";
 
+        autoCap = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("autoCap", true);
         if (store != null) store.reloadIfChanged();
         if (root != null) buildKeyboard();
         updateAutoShift();
@@ -646,7 +648,10 @@ public class CtrlKeyboardService extends InputMethodService {
             @Override public void run() {
                 longFired = true;
                 key.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                onKey(alt, false);
+                // Tampilkan simbolnya di tombol selama masih ditahan
+                key.setText(alt);
+                key.setBackground(bg(C_ACCENT, dp(8)));
+                key.setTextColor(C_ON_ACCENT);
             }
         };
 
@@ -665,23 +670,27 @@ public class CtrlKeyboardService extends InputMethodService {
                         onKey(token, true);
                         handler.postDelayed(repeater, 400);
                     } else if (alt != null) {
-                        handler.postDelayed(longPress, 350);
+                        handler.postDelayed(longPress, 300);
                     }
+                    return true;
+                case MotionEvent.ACTION_MOVE:
                     return true;
                 case MotionEvent.ACTION_UP:
                     handler.removeCallbacks(repeater);
                     handler.removeCallbacks(longPress);
                     setPressedLook(key, special, false);
                     if (repeat) afterRepeat();
-                    else if (!longFired) onKey(token, false);
+                    else if (longFired) { key.setTextColor(Color.WHITE); onKey(alt, false); refresh(); }
+                    else onKey(token, false);
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     handler.removeCallbacks(repeater);
                     handler.removeCallbacks(longPress);
                     setPressedLook(key, special, false);
+                    if (longFired) { key.setTextColor(Color.WHITE); refresh(); }
                     return true;
             }
-            return false;
+            return true;
         }
     }
 
@@ -885,6 +894,10 @@ public class CtrlKeyboardService extends InputMethodService {
 
     private void updateAutoShift() {
         if (mode != MODE_TEXT || layer != L_ALPHA || tShift == LOCK) return;
+        if (!autoCap) {
+            if (tShift == ONCE && autoShifted) { tShift = OFF; autoShifted = false; refresh(); }
+            return;
+        }
         InputConnection ic = getCurrentInputConnection();
         EditorInfo ei = getCurrentInputEditorInfo();
         if (ic == null || ei == null) return;
