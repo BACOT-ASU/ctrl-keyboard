@@ -45,32 +45,39 @@ public class CtrlKeyboardService extends InputMethodService {
 
     private static final int OFF = 0, ONCE = 1, LOCK = 2;
     private static final int MODE_TEXT = 0, MODE_CTRL = 1;
-    private static final int L_ALPHA = 0, L_SYM1 = 1, L_SYM2 = 2, L_PHRASES = 3;
+    private static final int L_ALPHA = 0, L_SYM1 = 1, L_SYM2 = 2, L_PHRASES = 3, L_EMOJI = 4;
 
-    private static final int C_BG = Color.parseColor("#202124");
-    private static final int C_KEY = Color.parseColor("#3C4043");
-    private static final int C_SPECIAL = Color.parseColor("#2D2E31");
-    private static final int C_ONCE = Color.parseColor("#1E88E5");
-    private static final int C_LOCK = Color.parseColor("#F57C00");
-    private static final int C_PRESSED = Color.parseColor("#5F6368");
-    private static final int C_HINT = Color.parseColor("#9AA0A6");
-    private static final int C_ACCENT = Color.parseColor("#8AB4F8");
+    /** Tinggi area tombol (di bawah bar saran), sama untuk semua layer agar tidak "loncat". */
+    private static final int KEYS_DP = 5 * 52;
+    private static final int STRIP_DP = 42;
 
-    // ---------------- Mode TEKS (ala Gboard). "q 1" = tombol q, tahan lama = 1
-    private static final String[] T1 = {"q 1", "w 2", "e 3", "r 4", "t 5", "y 6", "u 7", "i 8", "o 9", "p 0"};
-    private static final String[] T2 = {"a @", "s #", "d $", "f %", "g &", "h -", "j +", "k (", "l )"};
+    // Warna mengikuti Gboard tema gelap
+    private static final int C_BG = Color.parseColor("#1B1B1D");
+    private static final int C_KEY = Color.parseColor("#3A3A3C");
+    private static final int C_SPECIAL = Color.parseColor("#3A3A3C");
+    private static final int C_ONCE = Color.parseColor("#5B6B8C");
+    private static final int C_LOCK = Color.parseColor("#A8C7FA");
+    private static final int C_PRESSED = Color.parseColor("#5C5C60");
+    private static final int C_HINT = Color.parseColor("#B8B8BC");
+    private static final int C_ACCENT = Color.parseColor("#A8C7FA");
+    private static final int C_ON_ACCENT = Color.parseColor("#0B1D36");
+
+    // ---------------- Mode TEKS (ala Gboard + baris angka). "q %" = tombol q, tahan lama = %
+    private static final String[] T0 = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+    private static final String[] T1 = {"q %", "w \\", "e |", "r =", "t [", "y ]", "u <", "i >", "o {", "p }"};
+    private static final String[] T2 = {"a @", "s #", "d $", "f _", "g &", "h -", "j +", "k (", "l )"};
     private static final String[] T3 = {":shift", "z *", "x \"", "c '", "v :", "b ;", "n !", "m ?", ":bksp"};
-    private static final String[] T4 = {":sym", ",", ":space", ".", ":enter"};
+    private static final String[] T4 = {":sym", ",", ":emoji", ":space", ".", ":enter"};
 
     private static final String[] S1_1 = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
     private static final String[] S1_2 = {"@", "#", "$", "_", "&", "-", "+", "(", ")", "/"};
     private static final String[] S1_3 = {":sym2", "*", "\"", "'", ":", ";", "!", "?", ":bksp"};
-    private static final String[] S1_4 = {":abc", ",", ":space", ".", ":enter"};
+    private static final String[] S1_4 = {":abc", ",", ":emoji", ":space", ".", ":enter"};
 
     private static final String[] S2_1 = {"~", "`", "|", "•", "√", "π", "÷", "×", "¶", "∆"};
     private static final String[] S2_2 = {"£", "¢", "€", "¥", "^", "°", "=", "{", "}", "\\"};
     private static final String[] S2_3 = {":sym", "%", "©", "®", "™", "✓", "[", "]", ":bksp"};
-    private static final String[] S2_4 = {":abc", "<", ":space", ">", ":enter"};
+    private static final String[] S2_4 = {":abc", "<", ":emoji", ":space", ">", ":enter"};
 
     // ---------------- Mode CTRL
     private static final String[] ROW_TOOLS = {":textmode", ":copy", ":paste", ":pastetext", ":ctrlc"};
@@ -210,13 +217,116 @@ public class CtrlKeyboardService extends InputMethodService {
             buildPhrasePanel();
             return;
         }
+        if (layer == L_EMOJI) {
+            buildEmojiPanel();
+            return;
+        }
         String[][] rows;
         if (layer == L_SYM1) rows = new String[][]{S1_1, S1_2, S1_3, S1_4};
         else if (layer == L_SYM2) rows = new String[][]{S2_1, S2_2, S2_3, S2_4};
-        else rows = new String[][]{T1, T2, T3, T4};
+        else rows = new String[][]{T0, T1, T2, T3, T4};
+        int rowH = KEYS_DP / rows.length;
         for (int r = 0; r < rows.length; r++) {
-            addTextRow(rows[r], layer == L_ALPHA && r == 1);
+            addTextRow(rows[r], layer == L_ALPHA && r == 2, rowH);
         }
+    }
+
+    // ---------------------------------------------------------------- EMOJI
+
+    private int emojiCat = 0;           // -1 = baru dipakai
+    private final List<String> recentEmoji = new ArrayList<>();
+    private boolean recentLoaded = false;
+
+    private void loadRecent() {
+        if (recentLoaded) return;
+        recentLoaded = true;
+        String s = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("recentEmoji", "");
+        for (String e : s.split("\n")) if (!e.isEmpty()) recentEmoji.add(e);
+    }
+
+    private void addRecent(String e) {
+        recentEmoji.remove(e);
+        recentEmoji.add(0, e);
+        while (recentEmoji.size() > 40) recentEmoji.remove(recentEmoji.size() - 1);
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString("recentEmoji", TextUtils.join("\n", recentEmoji)).apply();
+    }
+
+    private void buildEmojiPanel() {
+        loadRecent();
+        final int barH = 48;
+        final ScrollView sv = new ScrollView(this);
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        sv.addView(grid);
+
+        List<String> items = new ArrayList<>();
+        if (emojiCat < 0) items.addAll(recentEmoji);
+        else for (String e : Emojis.CATS[emojiCat]) items.add(e);
+
+        if (items.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setTextColor(C_HINT);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(12), dp(24), dp(12), dp(12));
+            empty.setText("Emoji yang baru kamu pakai akan muncul di sini");
+            grid.addView(empty);
+        }
+        final int perRow = 8;
+        for (int i = 0; i < items.size(); i += perRow) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int j = 0; j < perRow; j++) {
+                TextView t = new TextView(this);
+                t.setGravity(Gravity.CENTER);
+                t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 27);
+                t.setLayoutParams(new LinearLayout.LayoutParams(0, dp(48), 1f));
+                if (i + j < items.size()) {
+                    final String e = items.get(i + j);
+                    t.setText(e);
+                    t.setOnClickListener(v -> {
+                        v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                        commit(e);
+                        addRecent(e);
+                    });
+                }
+                row.addView(t);
+            }
+            grid.addView(row);
+        }
+        root.addView(sv, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(KEYS_DP - barH)));
+
+        // Bar kategori di bawah, seperti Gboard: ABC | 🕘 😀 👋 … | ⌫
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        TextView abc = makeKey(":abc", null, 1.4f, true, false);
+        abc.setText("ABC");
+        abc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        abc.setBackground(bg(C_SPECIAL, dp(40)));
+        bar.addView(abc);
+        addEmojiTab(bar, "🕘", -1);
+        for (int c = 0; c < Emojis.ICONS.length; c++) addEmojiTab(bar, Emojis.ICONS[c], c);
+        TextView del = makeKey(":bksp", null, 1.4f, true, true);
+        del.setText("⌫");
+        del.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        del.setBackground(bg(C_SPECIAL, dp(40)));
+        bar.addView(del);
+        root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(barH)));
+    }
+
+    private void addEmojiTab(LinearLayout bar, String icon, final int cat) {
+        TextView t = new TextView(this);
+        t.setText(icon);
+        t.setGravity(Gravity.CENTER);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        t.setAlpha(cat == emojiCat ? 1f : 0.45f);
+        if (cat == emojiCat) t.setBackground(bg(C_PRESSED, dp(20)));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(36), 1f);
+        lp.setMargins(dp(1), 0, dp(1), 0);
+        t.setLayoutParams(lp);
+        t.setOnClickListener(v -> { emojiCat = cat; buildKeyboard(); });
+        bar.addView(t);
     }
 
     private void buildStrip() {
@@ -245,7 +355,7 @@ public class CtrlKeyboardService extends InputMethodService {
             sugViews[i] = s;
             strip.addView(s);
         }
-        root.addView(strip, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(42)));
+        root.addView(strip, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(STRIP_DP)));
     }
 
     private TextView stripText(String text, float weight, int color) {
@@ -261,7 +371,7 @@ public class CtrlKeyboardService extends InputMethodService {
         return t;
     }
 
-    private void addTextRow(String[] tokens, boolean indent) {
+    private void addTextRow(String[] tokens, boolean indent, int heightDp) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
@@ -271,24 +381,51 @@ public class CtrlKeyboardService extends InputMethodService {
             String base = parts[0];
             String alt = parts.length > 1 ? parts[1] : null;
             boolean special = base.startsWith(":") && base.length() > 1;
-            TextView k = makeKey(base, alt, textWeight(base), special, base.equals(":bksp"));
+            KeyView k = makeKey(base, alt, textWeight(base), special, base.equals(":bksp"));
+            k.setSingleLine(true);
             if (special) {
-                k.setSingleLine(true);
-                k.setTextSize(TypedValue.COMPLEX_UNIT_SP, base.equals(":enter") || base.equals(":bksp") || base.equals(":shift") ? 20 : 15);
+                boolean icon = base.equals(":enter") || base.equals(":bksp") || base.equals(":shift") || base.equals(":emoji");
+                k.setTextSize(TypedValue.COMPLEX_UNIT_SP, icon ? 22 : 15);
                 k.setText(textSpecialLabel(base));
                 if (base.equals(":shift")) modKeys.put(base, k);
-                if (base.equals(":enter")) k.setBackground(bg(C_ACCENT));
-                if (base.equals(":enter")) k.setTextColor(C_BG);
+                if (isPill(base)) k.setBackground(bg(base.equals(":enter") ? C_ACCENT : C_SPECIAL, dp(40)));
+                if (base.equals(":enter")) k.setTextColor(C_ON_ACCENT);
+                if (base.equals(":space")) k.setTextColor(C_HINT);
             } else {
-                k.setSingleLine(false);
-                k.setMaxLines(2);
-                k.setTextSize(TypedValue.COMPLEX_UNIT_SP, 21);
+                k.setTextSize(TypedValue.COMPLEX_UNIT_SP, base.equals(",") || base.equals(".") ? 22 : 24);
+                k.hint = alt;
                 charKeys.add(new KeyInfo(k, base, alt));
             }
             row.addView(k);
         }
         if (indent) row.addView(spacer(0.5f));
-        root.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(50)));
+        root.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(heightDp)));
+    }
+
+    private static boolean isPill(String base) {
+        return base.equals(":enter") || base.equals(":sym") || base.equals(":abc");
+    }
+
+    /** Tombol dengan huruf kecil di pojok kanan atas, seperti Gboard. */
+    private class KeyView extends TextView {
+        String hint;
+        private final android.graphics.Paint hintPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+        KeyView(Context c) {
+            super(c);
+            hintPaint.setColor(C_HINT);
+            hintPaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11,
+                    c.getResources().getDisplayMetrics()));
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas canvas) {
+            super.onDraw(canvas);
+            if (hint == null) return;
+            float pad = dp(5);
+            float w = hintPaint.measureText(hint);
+            canvas.drawText(hint, getWidth() - pad - w, pad - hintPaint.ascent(), hintPaint);
+        }
     }
 
     private View spacer(float w) {
@@ -299,7 +436,7 @@ public class CtrlKeyboardService extends InputMethodService {
 
     private static float textWeight(String base) {
         switch (base) {
-            case ":space": return 5f;
+            case ":space": return 4f;
             case ":shift": case ":bksp": case ":sym": case ":sym2": case ":abc": case ":enter": return 1.5f;
         }
         return 1f;
@@ -312,7 +449,8 @@ public class CtrlKeyboardService extends InputMethodService {
             case ":sym": return "?123";
             case ":sym2": return "=\\<";
             case ":abc": return "ABC";
-            case ":space": return "spasi";
+            case ":emoji": return "☺";
+            case ":space": return "";
             case ":enter": return enterLabel();
         }
         return t;
@@ -389,7 +527,7 @@ public class CtrlKeyboardService extends InputMethodService {
             });
             list.addView(item);
         }
-        root.addView(sv, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4 * 50 - 44)));
+        root.addView(sv, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(KEYS_DP - 44)));
     }
 
     private TextView makeButton(String text, float weight) {
@@ -480,8 +618,8 @@ public class CtrlKeyboardService extends InputMethodService {
 
     // ---------------------------------------------------------------- keys
 
-    private TextView makeKey(String token, String alt, float weight, boolean special, boolean repeat) {
-        TextView key = new TextView(this);
+    private KeyView makeKey(String token, String alt, float weight, boolean special, boolean repeat) {
+        KeyView key = new KeyView(this);
         key.setGravity(Gravity.CENTER);
         key.setTextColor(Color.WHITE);
         key.setIncludeFontPadding(false);
@@ -490,7 +628,7 @@ public class CtrlKeyboardService extends InputMethodService {
         int m = dp(2);
         lp.setMargins(m, m + 1, m, m + 1);
         key.setLayoutParams(lp);
-        key.setBackground(bg(special ? C_SPECIAL : C_KEY));
+        key.setBackground(keyBg(token, special, false));
         key.setOnTouchListener(new KeyTouch(key, token, alt, special, repeat));
         return key;
     }
@@ -549,9 +687,18 @@ public class CtrlKeyboardService extends InputMethodService {
 
     private void setPressedLook(TextView key, boolean special, boolean pressed) {
         String t = (String) key.getTag();
-        if (":enter".equals(t) && mode == MODE_TEXT && !pressed) { key.setBackground(bg(C_ACCENT)); return; }
-        key.setBackground(bg(pressed ? C_PRESSED : (special ? C_SPECIAL : C_KEY)));
+        key.setBackground(keyBg(t, special, pressed));
         if (!pressed && modKeys.containsKey(t)) refresh();
+    }
+
+    private GradientDrawable keyBg(String t, boolean special, boolean pressed) {
+        boolean pill = mode == MODE_TEXT && isPill(t);
+        int radius = pill ? dp(40) : dp(8);
+        int color;
+        if (pressed) color = C_PRESSED;
+        else if (mode == MODE_TEXT && ":enter".equals(t)) color = C_ACCENT;
+        else color = special ? C_SPECIAL : C_KEY;
+        return bg(color, radius);
     }
 
     private void onKey(String token, boolean fromRepeat) {
@@ -591,6 +738,13 @@ public class CtrlKeyboardService extends InputMethodService {
             case ":sym":  layer = L_SYM1;  buildKeyboard(); updateSuggestions(); return;
             case ":sym2": layer = L_SYM2;  buildKeyboard(); return;
             case ":abc":  layer = L_ALPHA; buildKeyboard(); updateAutoShift(); updateSuggestions(); return;
+            case ":emoji":
+                loadRecent();
+                layer = L_EMOJI;
+                emojiCat = recentEmoji.isEmpty() ? 0 : -1;
+                buildKeyboard();
+                updateSuggestions();
+                return;
             case ":bksp":
                 sendCombo(KeyEvent.KEYCODE_DEL, false, false, false);
                 return; // saran diperbarui lewat onUpdateSelection / afterRepeat
@@ -668,7 +822,7 @@ public class CtrlKeyboardService extends InputMethodService {
     private void updateSuggestions() {
         if (sugViews[0] == null) return;
         for (int i = 0; i < 3; i++) { sugValues[i] = null; sugPhrase[i] = false; }
-        if (mode == MODE_TEXT && layer != L_PHRASES && suggestAllowed && store != null) {
+        if (mode == MODE_TEXT && layer != L_PHRASES && layer != L_EMOJI && suggestAllowed && store != null) {
             String b = before(300);
             String cw = trailingWord(b);
             String line = currentLine(b).replaceAll("^\\s+", "");
@@ -962,7 +1116,7 @@ public class CtrlKeyboardService extends InputMethodService {
             TextView s = modKeys.get(":shift");
             if (s != null) s.setText(tShift == LOCK ? "⇪" : "⇧");
             boolean up = tShift != OFF && layer == L_ALPHA;
-            for (KeyInfo k : charKeys) k.v.setText(keyLabel(up ? k.base.toUpperCase() : k.base, k.hint));
+            for (KeyInfo k : charKeys) k.v.setText(up ? k.base.toUpperCase() : k.base);
         }
     }
 
@@ -982,9 +1136,13 @@ public class CtrlKeyboardService extends InputMethodService {
     }
 
     private GradientDrawable bg(int color) {
+        return bg(color, dp(8));
+    }
+
+    private GradientDrawable bg(int color, int radius) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
-        d.setCornerRadius(dp(7));
+        d.setCornerRadius(radius);
         return d;
     }
 
