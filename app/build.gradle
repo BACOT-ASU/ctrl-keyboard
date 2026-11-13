@@ -8,10 +8,23 @@ android {
 
     defaultConfig {
         applicationId 'com.bacad.ctrlkeyboard'
-        minSdk 21
+        minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        versionCode 2
+        versionName '2.0'
+    }
+
+    signingConfigs {
+        shared {
+            storeFile file('ctrlkb.keystore')
+            storePassword 'ctrlkb123'
+            keyAlias 'ctrlkb'
+            keyPassword 'ctrlkb123'
+        }
+    }
+
+    buildTypes {
+        debug { signingConfig signingConfigs.shared }
     }
 
     compileOptions {
